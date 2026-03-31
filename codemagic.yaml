@@ -1,154 +1,145 @@
 workflows:
-  auto_create_flutter_build:
-    name: Auto-Create Flutter Project & Build APK
+  build_pcb_inspector:
+    name: Build PCB Inspector
+    max_build_duration: 60
     environment:
       flutter: stable
+      vars:
+        APP_NAME: "pcb_inspector"
 
     scripts:
-      - name: Create Flutter App
+      - name: Create Flutter project
         script: |
-          flutter create my_app
-          echo "Flutter project created successfully."
+          flutter create $APP_NAME
+          cd $APP_NAME
 
-      - name: Replace pubspec.yaml with required dependencies
+      - name: Replace default main.dart with your custom code
         script: |
-          cd my_app
-          cat <<EOF > pubspec.yaml
-          name: dynamic_camera_app
-          description: Auto-generated Flutter camera app
-          publish_to: "none"
-
-          environment:
-            sdk: ">=3.3.0 <4.0.0"
-
-          dependencies:
-            flutter:
-              sdk: flutter
-            camera: ^0.11.0
-            gallery_saver: ^2.3.2
-            path_provider: ^2.1.2
-            image: ^4.2.0
-
-          dev_dependencies:
-            flutter_test:
-              sdk: flutter
-
-          flutter:
-            uses-material-design: true
-          EOF
-
-      - name: Inject main.dart with camera + gallery save + flexible resolution
-        script: |
-          cd my_app/lib
+          cd $APP_NAME/lib
           rm -f main.dart
 
-          cat <<'EOF' > main.dart
-          import 'dart:io';
-          import 'package:flutter/material.dart';
-          import 'package:camera/camera.dart';
-          import 'package:gallery_saver/gallery_saver.dart';
-          import 'package:path_provider/path_provider.dart';
+          cat > main.dart << "EOF"
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:path_provider/path_provider.dart';
+import 'api_service.dart';
 
-          Future<void> main() async {
-            WidgetsFlutterBinding.ensureInitialized();
-            final cameras = await availableCameras();
-            runApp(MyApp(cameras: cameras));
-          }
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final cameras = await availableCameras();
+  final firstCamera = cameras.first;
 
-          class MyApp extends StatelessWidget {
-            final List<CameraDescription> cameras;
-            const MyApp({super.key, required this.cameras});
+  runApp(MaterialApp(
+    home: CaptureScreen(camera: firstCamera),
+  ));
+}
 
-            @override
-            Widget build(BuildContext context) {
-              return MaterialApp(
-                home: CameraPage(cameras: cameras),
-              );
-            }
-          }
+class CaptureScreen extends StatefulWidget {
+  final CameraDescription camera;
+  CaptureScreen({required this.camera});
 
-          class CameraPage extends StatefulWidget {
-            final List<CameraDescription> cameras;
-            const CameraPage({super.key, required this.cameras});
+  @override
+  _CaptureScreenState createState() => _CaptureScreenState();
+}
 
-            @override
-            State<CameraPage> createState() => _CameraPageState();
-          }
+class _CaptureScreenState extends State<CaptureScreen> {
+  CameraController? controller;
+  bool processing = false;
+  XFile? processedImage;
 
-          class _CameraPageState extends State<CameraPage> {
-            CameraController? controller;
-            ResolutionPreset preset = ResolutionPreset.max;
+  @override
+  void initState() {
+    super.initState();
+    controller = CameraController(widget.camera, ResolutionPreset.max);
+    controller!.initialize().then((_) {
+      if (!mounted) return;
+      setState(() {});
+    });
+  }
 
-            @override
-            void initState() {
-              super.initState();
-              initCamera();
-            }
+  Future<void> captureAndUpload() async {
+    if (controller == null || !controller!.value.isInitialized) return;
 
-            Future<void> initCamera() async {
-              controller = CameraController(widget.cameras.first, preset, enableAudio: false);
-              await controller!.initialize();
-              setState(() {});
-            }
+    setState(() => processing = true);
 
-            Future<void> capture() async {
-              final file = await controller!.takePicture();
-              final temp = await getTemporaryDirectory();
-              final newPath = "${temp.path}/img_${DateTime.now().millisecondsSinceEpoch}.jpg";
+    final image = await controller!.takePicture();
+    final annotated = await ApiService.processImage(File(image.path));
 
-              final saved = await File(file.path).copy(newPath);
-              await GallerySaver.saveImage(saved.path);
+    setState(() {
+      processedImage = XFile(annotated.path);
+      processing = false;
+    });
+  }
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Saved to gallery")),
-              );
-            }
+  @override
+  Widget build(BuildContext context) {
+    if (controller == null || !controller!.value.isInitialized) {
+      return Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-            @override
-            Widget build(BuildContext context) {
-              if (!(controller?.value.isInitialized ?? false)) {
-                return Scaffold(body: Center(child: CircularProgressIndicator()));
-              }
+    return Scaffold(
+      appBar: AppBar(title: Text("PCB Inspector")),
+      body: Column(
+        children: [
+          Expanded(child: CameraPreview(controller!)),
+          if (processedImage != null)
+            Image.file(File(processedImage!.path), height: 200),
+          SizedBox(height: 10),
+          ElevatedButton(
+            onPressed: processing ? null : captureAndUpload,
+            child: processing ? Text("Processing...") : Text("Capture & Inspect"),
+          ),
+        ],
+      ),
+    );
+  }
+}
+EOF
 
-              return Scaffold(
-                appBar: AppBar(title: Text("Camera Test App")),
-                body: Column(
-                  children: [
-                    Expanded(child: CameraPreview(controller!)),
-                    DropdownButton<ResolutionPreset>(
-                      value: preset,
-                      items: ResolutionPreset.values
-                          .map((e) => DropdownMenuItem(
-                                value: e,
-                                child: Text(e.toString()),
-                              ))
-                          .toList(),
-                      onChanged: (v) async {
-                        preset = v!;
-                        await initCamera();
-                      },
-                    ),
-                    ElevatedButton(
-                      onPressed: capture,
-                      child: Text("Capture"),
-                    ),
-                  ],
-                ),
-              );
-            }
-          }
-          EOF
-
-      - name: Install dependencies
+      - name: Add API service file
         script: |
-          cd my_app
-          flutter pub get
+          cd $APP_NAME/lib
+          cat > api_service.dart << "EOF"
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+
+class ApiService {
+  static Future<File> processImage(File file) async {
+    final url = Uri.parse("YOUR_SERVER_URL/process");
+
+    var req = http.MultipartRequest("POST", url);
+    req.files.add(await http.MultipartFile.fromPath("file", file.path));
+
+    final res = await req.send();
+    final bytes = await res.stream.toBytes();
+
+    final dir = await getTemporaryDirectory();
+    final annotated = File("${dir.path}/annotated.png");
+    await annotated.writeAsBytes(bytes);
+
+    return annotated;
+  }
+}
+EOF
+
+      - name: Build dependencies
+        script: |
+          cd $APP_NAME
+          flutter pub add camera
+          flutter pub add path_provider
+          flutter pub add http
 
       - name: Build APK
         script: |
-          cd my_app
+          cd $APP_NAME
           flutter build apk --release
-          echo "APK build completed."
+
+      - name: Show APK paths
+        script: |
+          echo "APK files generated:"
+          find $APP_NAME/build/app/outputs -name "*.apk" -print
 
     artifacts:
-      - my_app/build/app/outputs/flutter-apk/app-release.apk
+      - $APP_NAME/build/app/outputs/flutter-apk/**/*.apk
