@@ -12,9 +12,9 @@ class PCBApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: "PCB Inspector",
-      debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: const CaptureScreen(),
+      home: CaptureScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
