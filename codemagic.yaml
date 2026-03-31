@@ -11,14 +11,12 @@ workflows:
       - name: Create Flutter project
         script: |
           flutter create $APP_NAME
-          cd $APP_NAME
 
-      - name: Replace default main.dart with your custom code
+      - name: Replace main.dart with custom code
         script: |
           cd $APP_NAME/lib
           rm -f main.dart
-
-          cat > main.dart << "EOF"
+          cat << 'EOF' > main.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
@@ -75,7 +73,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
   @override
   Widget build(BuildContext context) {
     if (controller == null || !controller!.value.isInitialized) {
-      return Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     return Scaffold(
@@ -88,7 +88,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
           SizedBox(height: 10),
           ElevatedButton(
             onPressed: processing ? null : captureAndUpload,
-            child: processing ? Text("Processing...") : Text("Capture & Inspect"),
+            child: processing
+                ? Text("Processing…")
+                : Text("Capture & Inspect"),
           ),
         ],
       ),
@@ -100,7 +102,7 @@ EOF
       - name: Add API service file
         script: |
           cd $APP_NAME/lib
-          cat > api_service.dart << "EOF"
+          cat << 'EOF' > api_service.dart
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -124,7 +126,7 @@ class ApiService {
 }
 EOF
 
-      - name: Build dependencies
+      - name: Add dependencies
         script: |
           cd $APP_NAME
           flutter pub add camera
@@ -136,10 +138,11 @@ EOF
           cd $APP_NAME
           flutter build apk --release
 
-      - name: Show APK paths
+      - name: Display APK files
         script: |
-          echo "APK files generated:"
+          echo "============= APKs Generated ============="
           find $APP_NAME/build/app/outputs -name "*.apk" -print
+          echo "=========================================="
 
     artifacts:
       - $APP_NAME/build/app/outputs/flutter-apk/**/*.apk
