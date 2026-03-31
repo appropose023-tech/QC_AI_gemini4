@@ -6,43 +6,55 @@ workflows:
       flutter: stable
       vars:
         APP_NAME: pcb_inspector
+
     scripts:
-      # 1. Create a new flutter project
-      - name: Create fresh Flutter structure
+      # 1. Create fresh Flutter project
+      - name: Create flutter structure
         script: |
           flutter create $APP_NAME
           rm -rf $APP_NAME/lib/*
           cp -R lib/* $APP_NAME/lib/
 
-      # 2. Copy your pubspec override
-      - name: Create pubspec.yaml
+      # 2. Overwrite pubspec.yaml with needed dependencies
+      - name: Inject pubspec.yaml
         script: |
           cat > $APP_NAME/pubspec.yaml << "EOF"
           name: pcb_inspector
           description: PCB inspector camera app
           publish_to: "none"
+
           environment:
             sdk: ">=3.1.0 <4.0.0"
+
           dependencies:
             flutter:
               sdk: flutter
             camera: ^0.11.0
             http: ^1.1.0
             path_provider: ^2.1.2
+            gallery_saver: ^2.3.2
+
           dev_dependencies:
             flutter_test:
               sdk: flutter
+
           flutter:
             uses-material-design: true
           EOF
 
-      # 3. Move into project folder
-      - name: Enter app folder
+      # 3. Ensure Android minSdkVersion >= 21
+      - name: Patch Android Gradle settings
+        script: |
+          cd $APP_NAME/android
+          sed -i '' 's/minSdkVersion.*/minSdkVersion 21/' app/build.gradle || true
+
+      # 4. Get flutter packages
+      - name: pub get
         script: |
           cd $APP_NAME
           flutter pub get
 
-      # 4. Build Release APK
+      # 5. Build release APK
       - name: Build APK
         script: |
           cd $APP_NAME
@@ -53,6 +65,6 @@ workflows:
 
     publishing:
       scripts:
-        - name: Print APK location
+        - name: APK Location
           script: |
-            echo "APK created at: $APP_NAME/build/app/outputs/flutter-apk/app-release.apk"
+            echo "APK path: $APP_NAME/build/app/outputs/flutter-apk/app-release.apk"
