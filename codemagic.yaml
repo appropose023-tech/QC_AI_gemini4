@@ -8,44 +8,44 @@ workflows:
         APP_NAME: "pcb_inspector_project"
 
     scripts:
-      # 1) Create new Flutter project
+      # 1) Backup your repo's lib directory
+      - name: Backup source lib folder
+        script: |
+          mkdir lib_backup
+          cp -R lib/* lib_backup/
+
+      # 2) Create fresh Flutter project
       - name: Create fresh Flutter project
         script: |
           flutter create $APP_NAME
-          cd $APP_NAME
 
-      # 2) Replace lib folder with provided files
-      - name: Inject your custom lib folder
+      # 3) Replace Flutter lib folder with your backup
+      - name: Inject your lib folder
         script: |
+          cd $APP_NAME
           rm -rf lib
           mkdir lib
-          cp -R ../lib/* lib/
+          cp -R ../lib_backup/* lib/
 
-      # 3) Ensure pubspec.yaml exists (Flutter created it)
-      - name: Verify pubspec.yaml
+      # 4) Add dependencies
+      - name: Add dependencies
         script: |
-          if [ ! -f pubspec.yaml ]; then
-            echo "pubspec.yaml missing!"; exit 1;
-          fi
-
-      # 4) Add required dependencies
-      - name: Add Flutter dependencies
-        script: |
+          cd $APP_NAME
           flutter pub add camera
           flutter pub add http
-
-          # For Android permissions
           flutter pub add permission_handler
 
-      # 5) Pub get
-      - name: Get packages
+      # 5) Get packages
+      - name: Flutter pub get
         script: |
+          cd $APP_NAME
           flutter pub get
 
-      # 6) Build release APK
-      - name: Build Release APK
+      # 6) Build APK
+      - name: Build APK
         script: |
+          cd $APP_NAME
           flutter build apk --release
 
     artifacts:
-      - build/app/outputs/flutter-apk/app-release.apk
+      - $APP_NAME/build/app/outputs/flutter-apk/app-release.apk
