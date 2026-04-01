@@ -1,59 +1,66 @@
 workflows:
   build_app:
-    name: Build Cross-Platform Flutter App
+    name: PCB App Builder
+    max_build_duration: 60
     scripts:
-      # --------------------------------------------------------
-      # 1. Backup repo-provided lib/ and android_overrides/
-      # --------------------------------------------------------
-      - name: Backup custom code
+      # Step 1 — backup repo code
+      - name: Backup repo code (lib + overrides)
         script: |
-          echo "Backing up custom lib and android_overrides..."
+          echo "Backing up repo code..."
           mkdir -p repo_backup/lib
           mkdir -p repo_backup/android_overrides
 
-          cp -R lib/* repo_backup/lib/ 2>/dev/null || true
-          cp -R android_overrides/* repo_backup/android_overrides/ 2>/dev/null || true
+          # Copy lib
+          if [ -d "./lib" ]; then
+            cp -R ./lib/* repo_backup/lib/ 2>/dev/null || true
+          fi
 
-      # --------------------------------------------------------
-      # 2. Create FULL Flutter project (all platforms)
-      # --------------------------------------------------------
-      - name: Create fresh Flutter skeleton with all platforms
+          # Copy android_overrides
+          if [ -d "./android_overrides" ]; then
+            cp -R ./android_overrides/* repo_backup/android_overrides/ 2>/dev/null || true
+          fi
+
+          echo "--- Repo backup contents ---"
+          ls -R repo_backup
+
+      # Step 2 — verify main.dart exists
+      - name: Verify Flutter entrypoint
         script: |
-          echo "Creating Flutter project with ALL platforms..."
-          flutter create --platforms=android,ios,web,windows,macos,linux pcb_app
+          if [ ! -f repo_backup/lib/main.dart ]; then
+            echo "❌ ERROR: repo_backup/lib/main.dart not found."
+            echo "Your repository must contain lib/main.dart before building."
+            exit 1
+          fi
+          echo "✓ main.dart found."
 
+      # Step 3 — create new Flutter project
+      - name: Create new Flutter project
+        script: |
+          flutter create pcb_app
           cd pcb_app
-          
-          # Remove auto-generated lib
+
+          # Remove default lib folder
           rm -rf lib/*
+          cd ..
 
-      # --------------------------------------------------------
-      # 3. Restore your custom lib/
-      # --------------------------------------------------------
-      - name: Restore lib folder
+      # Step 4 — restore backed up lib + android overrides
+      - name: Restore code into pcb_app
         script: |
-          echo "Restoring custom lib/"
-          cp -R ../repo_backup/lib/* pcb_app/lib/ 2>/dev/null || true
+          echo "Restoring lib..."
+          cp -R repo_backup/lib/* pcb_app/lib/ 2>/dev/null || true
 
-      # --------------------------------------------------------
-      # 4. Restore android_overrides into exact matching locations
-      # --------------------------------------------------------
-      - name: Restore Android overrides (if present)
-        script: |
           echo "Restoring android overrides..."
+          mkdir -p pcb_app/android/app/src/main/
+          cp -R repo_backup/android_overrides/* pcb_app/android/app/src/main/ 2>/dev/null || true
 
-          # Copy ARM directory structure but only overwrite what's present
-          # This ensures NO assumptions about file names (manifest only? XML only? etc.)
-          
-          rsync -av \
-            ../repo_backup/android_overrides/ \
-            pcb_app/android/app/src/main/ \
-            --ignore-missing-args || true
+          echo "--- Final project structure ---"
+          ls -R pcb_app
 
-      # --------------------------------------------------------
-      # 5. Build APK
-      # --------------------------------------------------------
+      # Step 5 — Build the release APK
       - name: Build Release APK
         script: |
           cd pcb_app
           flutter build apk --release
+
+    artifacts:
+      - pcb_app/build/app/outputs/flutter-apk/*.apk
