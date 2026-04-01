@@ -2,37 +2,40 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 class ResultScreen extends StatelessWidget {
-  final File original;
-  final File? processed;
+  final String imagePath;
+  final List defects;
 
   const ResultScreen({
     super.key,
-    required this.original,
-    required this.processed,
+    required this.imagePath,
+    required this.defects,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Results")),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 10),
-            const Text("Original PCB", style: TextStyle(fontSize: 18)),
-            Image.file(original),
-
-            const SizedBox(height: 25),
-
-            const Text("Processed Result", style: TextStyle(fontSize: 18)),
-            processed != null
-                ? Image.file(processed!)
-                : const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text("No defects detected OR server error."),
-                  ),
-          ],
-        ),
+      appBar: AppBar(title: const Text("Defect Result")),
+      body: Stack(
+        children: [
+          Image.file(File(imagePath)),
+          ...defects.map((d) {
+            return Positioned(
+              left: d["x"].toDouble(),
+              top: d["y"].toDouble(),
+              child: Container(
+                width: d["w"].toDouble(),
+                height: d["h"].toDouble(),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.red, width: 3),
+                ),
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        child: const Icon(Icons.arrow_back),
+        onPressed: () => Navigator.pop(context),
       ),
     );
   }
