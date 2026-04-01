@@ -1,56 +1,29 @@
 workflows:
   build_app:
-    name: Build PCB Inspector App
+    name: Build PCB Inspector
+    max_build_duration: 60
     environment:
       flutter: stable
-      vars:
-        APP_NAME: "pcb_inspector"
+
     scripts:
       - name: Create Flutter project
         script: |
-          if [ ! -d "./$APP_NAME" ]; then
-            flutter create $APP_NAME
-          fi
-
-      - name: Replace lib folder with repository lib
-        script: |
-          rm -rf $APP_NAME/lib
-          mkdir -p $APP_NAME/lib
-          cp -R lib/* $APP_NAME/lib/
-
-      - name: Remove default pubspec — create new minimal one
-        script: |
-          cat > $APP_NAME/pubspec.yaml <<EOF
-          name: pcb_inspector
-          description: PCB Defect Inspection App
-          publish_to: "none"
-
-          environment:
-            sdk: ">=3.0.0 <4.0.0"
-
-          dependencies:
-            flutter:
-              sdk: flutter
-            http: ^1.1.0
-            camera: ^0.11.0+2
-            path_provider: ^2.1.4
-            gallery_saver_updated: ^3.0.0
-
-          flutter:
-            uses-material-design: true
-          EOF
-
-      - name: Run flutter pub get
-        script: |
-          cd $APP_NAME
-          flutter pub get
+          flutter create pcb_inspector_project
+          rm -rf pcb_inspector_project/lib/*
+          cp -r lib pcb_inspector_project/
 
       - name: Build APK
         script: |
-          cd $APP_NAME
+          cd pcb_inspector_project
           flutter build apk --release
 
     artifacts:
-      - $APP_NAME/build/app/outputs/flutter-apk/app-release.apk
+      - pcb_inspector_project/build/app/outputs/flutter-apk/app-release.apk
 
-  
+    publishing:
+      email:
+        recipients:
+          - "allu.shark@gmail.com"
+        notify:
+          success: true
+          failure: true
