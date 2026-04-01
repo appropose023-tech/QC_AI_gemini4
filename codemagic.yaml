@@ -1,24 +1,56 @@
 workflows:
-  build_app:
+  build_pcb_app:
     name: Build PCB Inspector
     max_build_duration: 60
+
     environment:
       flutter: stable
 
     scripts:
-      - name: Create Flutter project
+      - name: Create Flutter project structure
         script: |
-          flutter create pcb_inspector_project
-          rm -rf pcb_inspector_project/lib/*
-          cp -r lib pcb_inspector_project/
+          flutter create pcb_app
+          rm -rf pcb_app/lib/*
+          cp -r lib/* pcb_app/lib/
 
-      - name: Build APK
+      - name: Write pubspec.yaml with required dependencies
         script: |
-          cd pcb_inspector_project
+          cat <<EOF > pcb_app/pubspec.yaml
+          name: pcb_app
+          description: PCB Inspector App
+          publish_to: "none"
+          version: 1.0.0+1
+
+          environment:
+            sdk: ">=2.17.0 <4.0.0"
+
+          dependencies:
+            flutter:
+              sdk: flutter
+            camera: ^0.10.5+5
+            http: ^1.1.0
+            path_provider: ^2.0.12
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+
+          flutter:
+            uses-material-design: true
+          EOF
+
+      - name: Install packages
+        script: |
+          cd pcb_app
+          flutter pub get
+
+      - name: Build release APK
+        script: |
+          cd pcb_app
           flutter build apk --release
 
     artifacts:
-      - pcb_inspector_project/build/app/outputs/flutter-apk/app-release.apk
+      - pcb_app/build/app/outputs/flutter-apk/app-release.apk
 
     publishing:
       email:
