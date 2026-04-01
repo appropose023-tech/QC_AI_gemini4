@@ -1,37 +1,38 @@
-import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:gallery_saver_updated/gallery_saver.dart';
 
 class ResultScreen extends StatelessWidget {
-  final String processedBase64;
-  final int defectCount;
+  final File original;
+  final File? processed;
 
-  ResultScreen({
-    required this.processedBase64,
-    required this.defectCount,
+  const ResultScreen({
+    super.key,
+    required this.original,
+    required this.processed,
   });
 
   @override
   Widget build(BuildContext context) {
-    Uint8List imgBytes = base64Decode(processedBase64);
-
     return Scaffold(
-      appBar: AppBar(title: Text("Result ($defectCount defects)")),
-      body: Column(
-        children: [
-          Expanded(
-            child: Image.memory(imgBytes, fit: BoxFit.contain),
-          ),
-          ElevatedButton(
-            child: Text("Save to Gallery"),
-            onPressed: () async {
-              await GallerySaver.saveImageBytes(imgBytes, "pcb_output");
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(SnackBar(content: Text("Saved!")));
-            },
-          ),
-        ],
+      appBar: AppBar(title: const Text("Results")),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            const Text("Original PCB", style: TextStyle(fontSize: 18)),
+            Image.file(original),
+
+            const SizedBox(height: 25),
+
+            const Text("Processed Result", style: TextStyle(fontSize: 18)),
+            processed != null
+                ? Image.file(processed!)
+                : const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text("No defects detected OR server error."),
+                  ),
+          ],
+        ),
       ),
     );
   }
