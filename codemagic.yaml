@@ -39,13 +39,15 @@ workflows:
       # ----------------------------------------------------
       # 3. Apply ANDROID Overrides
       # ----------------------------------------------------
-      - name: Apply Android Overrides
+           - name: Apply Android Overrides
         script: |
           echo ">>> Applying Android override files..."
-          if [ -d "/tmp/repo_files/android_overrides" ]; then
-            rsync -av /tmp/repo_files/android_overrides/ ./android/app/
+
+          if [ -d "/tmp/repo_files/android_overrides/app/src/main" ]; then
+            echo ">>> Copying AndroidManifest + res/xml..."
+            rsync -av /tmp/repo_files/android_overrides/app/src/main/ ./android/app/src/main/
           else
-            echo "No android_overrides folder found!"
+            echo "No valid android_overrides folder found!"
           fi
 
           mkdir -p android/app/src/main/res/xml
