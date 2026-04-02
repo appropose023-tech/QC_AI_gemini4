@@ -10,71 +10,68 @@ workflows:
     scripts:
 
       # ----------------------------------------------------
-      # 1. Create Full Flutter Project Scaffold
+      # 1. Scaffold a Full Flutter Project (creates pubspec.yaml)
       # ----------------------------------------------------
       - name: Scaffold Flutter Multiplatform Project
         script: |
-          echo ">>> Backing up repository..."
+          echo ">>> Backing up your repo files..."
           mkdir -p /tmp/repo_files
           rsync -av ./ /tmp/repo_files \
             --exclude ".git" \
-            --exclude ".dart_tool" \
             --exclude "build" \
-            --exclude ".gradle"
+            --exclude ".dart_tool"
 
           echo ">>> Cleaning workspace..."
-          find . -mindepth 1 -maxdepth 1 -not -name "." -exec rm -rf {} \;
+          find . -mindepth 1 -maxdepth 1 -exec rm -rf {} \;
 
-          echo ">>> Creating new Flutter project with all platforms..."
-          flutter create --platforms=android,ios,web,linux,macos,windows --project-name pcb_app .
+          echo ">>> Creating full Flutter project with all platforms..."
+          flutter create --project-name pcb_app --platforms=android,ios,web,linux,macos,windows .
 
       # ----------------------------------------------------
-      # 2. Inject repository content
+      # 2. Inject Your LIB Folder
       # ----------------------------------------------------
-      - name: Restore Project Source Code
+      - name: Restore Source Files
         script: |
-          echo ">>> Restoring lib folder..."
+          echo ">>> Restoring lib folder from repository..."
           rm -rf lib
           cp -R /tmp/repo_files/lib ./lib
 
-          echo ">>> Restoring pubspec.yaml if exists..."
-          if [ -f "/tmp/repo_files/pubspec.yaml" ]; then
-            cp /tmp/repo_files/pubspec.yaml ./pubspec.yaml
-          else
-            echo "No pubspec.yaml found — keeping auto-generated one."
-          fi
-
       # ----------------------------------------------------
-      # 3. Apply Android Overrides
+      # 3. Apply ANDROID Overrides
       # ----------------------------------------------------
       - name: Apply Android Overrides
         script: |
+          echo ">>> Applying Android override files..."
           if [ -d "/tmp/repo_files/android_overrides" ]; then
-            echo ">>> Applying Android override files..."
             rsync -av /tmp/repo_files/android_overrides/ ./android/app/
           else
-            echo "No android_overrides directory found!"
+            echo "No android_overrides folder found!"
           fi
 
-          echo ">>> Ensure network_security_config path..."
           mkdir -p android/app/src/main/res/xml
-
           if [ -f "/tmp/repo_files/android_overrides/app/src/main/res/xml/network_security_config.xml" ]; then
             cp /tmp/repo_files/android_overrides/app/src/main/res/xml/network_security_config.xml \
                android/app/src/main/res/xml/network_security_config.xml
           fi
 
       # ----------------------------------------------------
-      # 4. Install Dependencies
+      # 4. Add Required Dependencies (pubspec.yaml auto-created)
       # ----------------------------------------------------
-      - name: Flutter pub get
-        script: flutter pub get
+      - name: Add Required Packages
+        script: |
+          echo ">>> Adding required packages..."
+          flutter pub add http
+          flutter pub add camera
+
+          echo ">>> Running pub get..."
+          flutter pub get
 
       # ----------------------------------------------------
       # 5. Build Android APK
       # ----------------------------------------------------
       - name: Build Android APK
-        script: flutter build apk --release
+        script: |
+          flutter build apk --release
 
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
