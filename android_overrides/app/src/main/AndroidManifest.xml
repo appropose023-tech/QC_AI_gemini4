@@ -32,13 +32,13 @@
         android:label="pcb_app"
         android:icon="@mipmap/ic_launcher"
         android:name="android.app.Application"
-        android:extractNativeLibs="false"
-        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config">
         tools:replace="android:appComponentFactory">
 
         <activity
             android:theme="@style/LaunchTheme"
-            android:name="com.example.pcb_app.MainActivity"
+            android:name=".MainActivity"
             android:exported="true"
             android:taskAffinity=""
             android:launchMode="singleTop"
