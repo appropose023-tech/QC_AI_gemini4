@@ -32,7 +32,6 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
     _fetchProjects();
   }
 
-  // Fetch folders from BASE_DATA_DIR on server
   Future<void> _fetchProjects() async {
     try {
       final response = await http.get(Uri.parse('$serverIp/get_projects'));
@@ -52,7 +51,6 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
     final pickedFile = await picker.pickImage(source: ImageSource.camera);
 
     if (pickedFile != null) {
-      // 1. CROPPER LOGIC
       CroppedFile? croppedFile = await ImageCropper().cropImage(
         sourcePath: pickedFile.path,
         uiSettings: [
@@ -74,12 +72,10 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
         _reportUrl = null;
       });
 
-      // 2. UPLOAD LOGIC
       try {
         String endpoint = isGolden ? "/upload_golden" : "/inspect";
         var request = http.MultipartRequest('POST', Uri.parse('$serverIp$endpoint'));
 
-        // Sanitize project name
         String projName = _projectController.text.trim().replaceAll(" ", "_");
         if (projName.isEmpty) {
           setState(() => _status = "Error: Project Name Required");
@@ -99,7 +95,6 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
             _status = isGolden ? "Golden Saved!" : data['status'];
             if (!isGolden) _reportUrl = serverIp + data['report_url'];
           });
-          // Refresh project list if we added a new one
           if (isGolden) _fetchProjects();
         } else {
           setState(() => _status = "Server Error: ${response.statusCode}");
@@ -120,23 +115,19 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Custom Project Input
               TextField(
                 controller: _projectController,
                 decoration: InputDecoration(
-                  labelText: "Current Project Name",
-                  hintText: "Enter new or select from list",
+                  labelText: "Project Name",
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.precision_manufacturing),
                 ),
               ),
               SizedBox(height: 12),
-
-              // 2. Flexible Dropdown
               DropdownButtonFormField<String>(
                 decoration: InputDecoration(
                   border: OutlineInputBorder(),
-                  labelText: "Quick Select Existing Project",
+                  labelText: "Select Existing Project",
                 ),
                 value: _existingProjects.contains(_selectedProject) ? _selectedProject : null,
                 items: _existingProjects.map((String val) {
@@ -150,14 +141,11 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
                 },
               ),
               SizedBox(height: 12),
-
               TextField(
                 decoration: InputDecoration(labelText: "Batch Number", border: OutlineInputBorder()),
                 onChanged: (val) => _batchNumber = val,
               ),
               SizedBox(height: 20),
-
-              // 3. Action Buttons
               Row(
                 children: [
                   Expanded(
@@ -181,72 +169,20 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
                   ),
                 ],
               ),
-
               Divider(height: 40),
-
-              // 4. Status & Results
               Center(
-                child: Text("Status: $_status",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
-                    color: _status.contains("Defect") ? Colors.red : Colors.green)),
-              ),
-
-              if (_reportUrl != null) ...[
-                SizedBox(height: 20),
-                Text("Inspection Report (Mumbai Factory):", style: TextStyle(fontWeight: FontWeight.bold)),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(_reportUrl!, key: ValueKey(_reportUrl)),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}              SizedBox(height: 10),
-              TextField(
-                decoration: InputDecoration(labelText: "Batch Number", border: OutlineInputBorder()),
-                onChanged: (val) => _batchNumber = val,
-              ),
-              
-              SizedBox(height: 20),
-
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: Icon(Icons.star),
-                      label: Text("Set Golden"),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.amber[800], foregroundColor: Colors.white),
-                      onPressed: () => _processImage(isGolden: true),
-                    ),
+                child: Text(
+                  "Status: $_status",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _status.contains("Defect") ? Colors.red : Colors.green,
                   ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: Icon(Icons.search),
-                      label: Text("Inspect"),
-                      onPressed: () => _processImage(isGolden: false),
-                    ),
-                  ),
-                ],
-              ),
-
-              Divider(height: 40),
-              
-              Center(
-                child: Text("Status: $_status", 
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, 
-                  color: _status.contains("Defect") ? Colors.red : Colors.green)
                 ),
               ),
-              
               if (_reportUrl != null) ...[
                 SizedBox(height: 20),
-                Text("Inspection Result:", style: TextStyle(fontWeight: FontWeight.bold)),
+                Text("Inspection Report:", style: TextStyle(fontWeight: FontWeight.bold)),
                 Image.network(_reportUrl!, key: ValueKey(_reportUrl)),
               ] else if (_image != null) ...[
                 SizedBox(height: 20),
