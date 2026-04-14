@@ -7,7 +7,12 @@ import 'dart:convert';
 
 void main() => runApp(MaterialApp(
       home: PCBInspectorApp(),
-      theme: ThemeData(primarySwatch: Colors.indigo, useMaterial3: true),
+      theme: ThemeData(
+        primarySwatch: Colors.indigo, 
+        useMaterial3: true,
+        colorSchemeSeed: Colors.indigo,
+      ),
+      debugShowCheckedModeBanner: false,
     ));
 
 class PCBInspectorApp extends StatefulWidget {
@@ -24,6 +29,7 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
   String? _reportUrl;
 
   final TextEditingController _projectController = TextEditingController();
+  // Ensure this IP matches your Google Cloud / Server address
   final String serverIp = "http://104.154.76.47:5000";
 
   @override
@@ -32,6 +38,7 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
     _fetchProjects();
   }
 
+  // 1. Fetch existing project folders from the server
   Future<void> _fetchProjects() async {
     try {
       final response = await http.get(Uri.parse('$serverIp/get_projects'));
@@ -42,24 +49,32 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
         });
       }
     } catch (e) {
-      setState(() => _status = "Fetch Error: Check Connection");
+      setState(() => _status = "Fetch Error: Check Server Connection");
     }
   }
 
+  // 2. Capture, Crop, and Upload logic
   Future<void> _processImage({required bool isGolden}) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.camera);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 90, // High quality for YOLO detection
+    );
 
     if (pickedFile != null) {
+      // IMAGE CROPPER (Updated for version 12.1.0+)
       CroppedFile? croppedFile = await ImageCropper().cropImage(
         sourcePath: pickedFile.path,
         uiSettings: [
           AndroidUiSettings(
             toolbarTitle: isGolden ? 'Align Golden Sample' : 'Align Test PCB',
-            toolbarColor: isGolden ? Colors.orange : Colors.indigo,
+            toolbarColor: isGolden ? Colors.orange[800] : Colors.indigo,
             toolbarWidgetColor: Colors.white,
             initAspectRatio: CropAspectRatioPreset.original,
             lockAspectRatio: false,
+          ),
+          IOSUiSettings(
+            title: isGolden ? 'Align Golden Sample' : 'Align Test PCB',
           ),
         ],
       );
@@ -72,10 +87,12 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
         _reportUrl = null;
       });
 
+      // UPLOAD LOGIC
       try {
         String endpoint = isGolden ? "/upload_golden" : "/inspect";
         var request = http.MultipartRequest('POST', Uri.parse('$serverIp$endpoint'));
 
+        // Project Name from TextField
         String projName = _projectController.text.trim().replaceAll(" ", "_");
         if (projName.isEmpty) {
           setState(() => _status = "Error: Project Name Required");
@@ -92,15 +109,19 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
         if (response.statusCode == 200) {
           var data = json.decode(response.body);
           setState(() {
-            _status = isGolden ? "Golden Saved!" : data['status'];
-            if (!isGolden) _reportUrl = serverIp + data['report_url'];
+            _status = isGolden ? "Golden Saved Successfully!" : data['status'];
+            if (!isGolden) {
+              // Add timestamp to force image refresh in Flutter
+              _reportUrl = serverIp + data['report_url'] + "?t=${DateTime.now().millisecondsSinceEpoch}";
+            }
           });
+          // Refresh project list if we added a new project
           if (isGolden) _fetchProjects();
         } else {
           setState(() => _status = "Server Error: ${response.statusCode}");
         }
       } catch (e) {
-        setState(() => _status = "Connection Failed");
+        setState(() => _status = "Connection Failed: $e");
       }
     }
   }
@@ -108,26 +129,34 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("AOI Factory Aggregator")),
+      appBar: AppBar(
+        title: Text("QC AI - PCB Inspector"),
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+      ),
       body: Padding(
         padding: EdgeInsets.all(16.0),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // PROJECT INPUT
               TextField(
                 controller: _projectController,
                 decoration: InputDecoration(
-                  labelText: "Project Name",
+                  labelText: "Current Project Name",
+                  hintText: "Enter name (e.g., Inverter_V1)",
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.precision_manufacturing),
                 ),
               ),
               SizedBox(height: 12),
+
+              // DYNAMIC PROJECT DROPDOWN
               DropdownButtonFormField<String>(
                 decoration: InputDecoration(
                   border: OutlineInputBorder(),
-                  labelText: "Select Existing Project",
+                  labelText: "Quick Select Existing Project",
                 ),
                 value: _existingProjects.contains(_selectedProject) ? _selectedProject : null,
                 items: _existingProjects.map((String val) {
@@ -141,11 +170,18 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
                 },
               ),
               SizedBox(height: 12),
+
+              // BATCH NUMBER
               TextField(
-                decoration: InputDecoration(labelText: "Batch Number", border: OutlineInputBorder()),
+                decoration: InputDecoration(
+                  labelText: "Batch Number", 
+                  border: OutlineInputBorder()
+                ),
                 onChanged: (val) => _batchNumber = val,
               ),
               SizedBox(height: 20),
+
+              // ACTION BUTTONS
               Row(
                 children: [
                   Expanded(
@@ -154,7 +190,10 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
                       icon: Icon(Icons.stars),
                       label: Text("Set Golden"),
                       style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange[800], foregroundColor: Colors.white),
+                        backgroundColor: Colors.orange[800], 
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 12)
+                      ),
                     ),
                   ),
                   SizedBox(width: 10),
@@ -164,30 +203,56 @@ class _PCBInspectorAppState extends State<PCBInspectorApp> {
                       icon: Icon(Icons.camera_alt),
                       label: Text("Inspect"),
                       style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.indigo, foregroundColor: Colors.white),
+                        backgroundColor: Colors.indigo, 
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 12)
+                      ),
                     ),
                   ),
                 ],
               ),
-              Divider(height: 40),
+
+              Divider(height: 40, thickness: 1),
+
+              // STATUS DISPLAY
               Center(
                 child: Text(
                   "Status: $_status",
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: _status.contains("Defect") ? Colors.red : Colors.green,
+                    color: _status.contains("Defect") || _status.contains("Error") 
+                        ? Colors.red 
+                        : Colors.green[700],
                   ),
                 ),
               ),
+
+              // RESULTS DISPLAY
               if (_reportUrl != null) ...[
                 SizedBox(height: 20),
-                Text("Inspection Report:", style: TextStyle(fontWeight: FontWeight.bold)),
-                Image.network(_reportUrl!, key: ValueKey(_reportUrl)),
+                Text("Inspection Report (AI Analysis):", 
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+                SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    _reportUrl!, 
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return Center(child: CircularProgressIndicator());
+                    },
+                  ),
+                ),
               ] else if (_image != null) ...[
                 SizedBox(height: 20),
-                Text("Last Captured:"),
-                Image.file(_image!, height: 200),
+                Text("Last Captured Image (Local):"),
+                SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(_image!, height: 250, fit: BoxFit.cover),
+                ),
               ],
             ],
           ),
